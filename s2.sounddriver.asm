@@ -471,7 +471,8 @@ zUpdateEverything:
 	; sound to be played.  This is called after updating the DAC track.
 	; Otherwise it just mucks with the timing loop, forcing an update.
 zUpdateDAC:
-
+	ld	a,2Ah		; DAC port
+	ld	(zYM2612_A0),a	; Set DAC port register
 	bankswitch SndDAC_Start	; Bankswitch to the DAC data
 
 	ld	a,(zCurDAC)	; Get currently playing DAC sound
@@ -495,7 +496,7 @@ zUpdateDAC:
 	add	a,a			; a *= 4 (each DAC entry is a pointer and length, 2+2)
 	add	a,zDACPtrTbl&0FFh	; Get low byte into table -> 'a'
 	ld	(zloc_104+1),a		; store into the instruction after zloc_104 (self-modifying code)
-	add	a,zDACLenTbl-zDACPtrTbl	; How to offset to length versus pointer
+	add	a,2			; How to offset to length versus pointer
 	ld	(zloc_107+2),a		; store into the instruction after zloc_107 (self-modifying code)
 	pop	af
 	ld	hl,zWriteToDAC
@@ -505,7 +506,7 @@ zloc_104:
 	ld	hl,(zDACPtrTbl)	; "self-modified code" -- sets start address of DAC sample for zWriteToDAC
 
 zloc_107:
-	ld	de,(zDACLenTbl)	; "self-modified code" -- sets length of DAC sample for zWriteToDAC
+	ld	de,(zDACPtrTbl+2)	; "self-modified code" -- sets length of DAC sample for zWriteToDAC
 
 zloc_10B:
 	ld	bc,100h ; "self-modified code" -- From zloc_22A; sets b=1 (the 100h part of it) UPDATE RIGHT AWAY and c="data rate delay" for this DAC sample, the future 'b' setting
@@ -643,8 +644,6 @@ zWriteToDAC:
 	djnz	$		; Busy wait for specific amount of time in 'b'
 
 	di			; disable interrupts (while updating DAC)
-	ld	a,2Ah		; DAC port
-	ld	(zYM2612_A0),a	; Set DAC port register
 	ld	a,(hl)		; Get next DAC byte
 	rlca
 	rlca
@@ -663,10 +662,6 @@ zloc_18B:
 	djnz	$		; Busy wait for specific amount of time in 'b'
 
 	di			; disable interrupts (while updating DAC)
-	push	af
-	pop	af
-	ld	a,2Ah		; DAC port
-	ld	(zYM2612_A0),a	; Set DAC port register
 	ld	b,c		; reload 'b' with wait value
 	ld	a,(hl)		; Get next DAC byte
 	inc	hl		; Next byte in DAC stream...
@@ -3548,10 +3543,7 @@ DACSize macro Sample
 	dw	Sample_End-Sample
 	endm
 zDACPtrTbl:
-zDACPtr_Kick:	dw	zmake68kPtr(SndDAC_Kick)
-zDACLenTbl:
-			dw	SndDAC_Kick_End-SndDAC_Kick
-
+zDACPtr_Kick:		DACSize	SndDAC_Kick
 zDACPtr_Snare:		DACSize	SndDAC_Snare	
 zDACPtr_Clap:		DACSize	SndDAC_Clap
 zDACPtr_Scratch:	DACSize SndDAC_Scratch
@@ -3563,25 +3555,6 @@ zDACPtr_Bongo:		DACSize SndDAC_Bongo
 	; First byte selects one of the DAC samples.  The number that
 	; follows it is a wait time between each nibble written to the DAC
 	; (thus higher = slower)
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
 	ensure1byteoffset 22h
 ; zbyte_124F:
 zDACMasterPlaylist:
@@ -3590,23 +3563,23 @@ offset :=	zDACPtrTbl
 ptrsize :=	2+2
 idstart :=	81h
 
-	db	id(zDACPtr_Kick),17h		; 81h
-	db	id(zDACPtr_Snare),1		; 82h
-	db	id(zDACPtr_Clap),6		; 83h
-	db	id(zDACPtr_Scratch),8		; 84h
+	db	id(zDACPtr_Kick),6		; 81h
+	db	id(zDACPtr_Snare),6		; 82h
+	db	id(zDACPtr_Clap),8		; 83h
+	db	id(zDACPtr_Scratch),18h		; 84h
 	db	id(zDACPtr_Timpani),1Bh		; 85h
-	db	id(zDACPtr_Tom),0Ah		; 86h
-	db	id(zDACPtr_Bongo),1Bh		; 87h
+	db	id(zDACPtr_Tom),20h		; 86h
+	db	id(zDACPtr_Bongo),1Eh		; 87h
 	db	id(zDACPtr_Timpani),12h		; 88h
 	db	id(zDACPtr_Timpani),15h		; 89h
 	db	id(zDACPtr_Timpani),1Ch		; 8Ah
 	db	id(zDACPtr_Timpani),1Dh		; 8Bh
-	db	id(zDACPtr_Tom),2		; 8Ch
-	db	id(zDACPtr_Tom),5		; 8Dh
-	db	id(zDACPtr_Tom),8		; 8Eh
-	db	id(zDACPtr_Bongo),8		; 8Fh
-	db	id(zDACPtr_Bongo),0Bh		; 90h
-	db	id(zDACPtr_Bongo),12h		; 91h
+	db	id(zDACPtr_Tom),0Eh		; 8Ch
+	db	id(zDACPtr_Tom),14h		; 8Dh
+	db	id(zDACPtr_Tom),1Ah		; 8Eh
+	db	id(zDACPtr_Bongo),0Ah		; 8Fh
+	db	id(zDACPtr_Bongo),0Dh		; 90h
+	db	id(zDACPtr_Bongo),14h		; 91h
 
 ; ---------------------------------------------------------------------------
 	; space for a few global variables
